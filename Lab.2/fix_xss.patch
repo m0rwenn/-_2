@@ -1,0 +1,138 @@
+--- app_old.py	2026-11-13 01:38:49
++++ app.py	2026-11-13 01:43:27
+@@ -1,7 +1,4 @@
+ 
+-# app.py — учебный сервис заметок (Modern UI)
+-# ВНИМАНИЕ: намеренно содержит уязвимости (OWASP Top 10).
+-# Запускать строго локально (127.0.0.1) или в изолированной ВМ.
+ 
+ import html
+ import http.server
+@@ -14,14 +11,10 @@
+ PORT = 8000
+ DB_FILE = "notes.db"
+ 
+-# Сессии в памяти: token -> (user_id, username)
++
+ SESSIONS = {}
+ 
+ 
+-# ==========================================
+-# 1. БАЗА ДАННЫХ
+-# ==========================================
+-
+ def get_db():
+     conn = sqlite3.connect(DB_FILE)
+     conn.row_factory = sqlite3.Row
+@@ -54,25 +47,23 @@
+             ('admin', 'SuperSecretAdminPass!');
+ 
+         INSERT INTO notes (user_id, title, content) VALUES
+-            (1, '🛒 Список покупок', 'Овсяное молоко, зерновой кофе, манго'),
+-            (2, '🔒 Личный дневник Боба', 'Секретный пароль от корпоративного Wi-Fi: 99887766'),
+-            (3, '🚨 СЕКРЕТНЫЙ КЛЮЧ АДМИНИСТРАТОРА', 'FLAG{idor_and_sqli_are_dangerous}');
++            (1, ' Список покупок', 'Овсяное молоко, зерновой кофе, манго'),
++            (2, ' Личный дневник Боба', 'Секретный пароль от корпоративного Wi-Fi: 99887766'),
++            (3, ' СЕКРЕТНЫЙ КЛЮЧ АДМИНИСТРАТОРА', 'FLAG{idor_and_sqli_are_dangerous}');
+     """)
+     conn.commit()
+     conn.close()
+ 
+ 
+-# ==========================================
+-# 2. КРАСИВЫЙ ШАБЛОН (CSS)
+-# ==========================================
+ 
++
+ def render_page(title, body, user=None):
+     if user:
+-        user_badge = f'<span class="badge">👤 {html.escape(user[1])}</span>'
++        user_badge = f'<span class="badge"> {html.escape(user[1])}</span>'
+         nav_links = f"""
+-            <a href="/" class="nav-link">📝 Мои заметки</a>
++            <a href="/" class="nav-link"> Мои заметки</a>
+             <a href="/new" class="nav-link highlight">+ Новая заметка</a>
+-            <a href="/search" class="nav-link">🔍 Поиск</a>
++            <a href="/search" class="nav-link"> Поиск</a>
+             <a href="/logout" class="nav-link danger">Выйти</a>
+         """
+     else:
+@@ -209,9 +200,6 @@
+ </html>"""
+ 
+ 
+-# ==========================================
+-# 3. ЛОГИКА СТРАНИЦ
+-# ==========================================
+ 
+ def view_index(user):
+     if not user:
+@@ -234,11 +222,10 @@
+ 
+     items = ""
+     for n in notes:
+-        # УЯЗВИМОСТЬ: Stored XSS (вывод заголовка и контента без экранирования)
+-        items += f"""
++             items += f"""
+         <div class="card">
+-            <h3><a href="/note?id={n['id']}">{n['title']}</a></h3>
+-            <p>{n['content']}</p>
++   <h3><a href="/note?id={n['id']}">{html.escape(n['title'])}</a></h3>
++<p>{html.escape(n['content'])}</p>
+         </div>
+         """
+     body = f"<h2 style='margin-bottom: 20px;'>Ваши заметки</h2>" + (items or "<p style='color: var(--text-muted);'>Здесь пока ничего нет. Создайте первую заметку!</p>")
+@@ -247,19 +234,19 @@
+ 
+ def view_note_detail(user, note_id):
+     conn = get_db()
+-    # УЯЗВИМОСТЬ: IDOR (нет проверки владельца user_id)
++
+     note = conn.execute("SELECT id, user_id, title, content FROM notes WHERE id = ?", (note_id,)).fetchone()
+     conn.close()
+ 
+     if not note:
+         return 404, render_page("Не найдено", "<div class='error-box'>Заметка не найдена</div>", user)
+ 
+-    # УЯЗВИМОСТЬ: Stored XSS
++
+     body = f"""
+         <div class="card">
+             <span class="badge" style="margin-bottom: 12px; display: inline-block;">Заметка #{note['id']} • Владелец ID: {note['user_id']}</span>
+-            <h1 style="margin-bottom: 16px;">{note['title']}</h1>
+-            <p style="font-size: 1.1rem; line-height: 1.7; color: var(--text-main);">{note['content']}</p>
++         <h1 style="margin-bottom: 16px;">{html.escape(note['title'])}</h1>
++<p style="font-size: 1.1rem; line-height: 1.7; color: var(--text-main);">{html.escape(note['content'])}</p>
+             <div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px;">
+                 <a href="/" style="color: var(--primary); text-decoration: none; font-weight: 600;">← Назад к списку</a>
+             </div>
+@@ -273,7 +260,7 @@
+     if query:
+         conn = get_db()
+         try:
+-            # УЯЗВИМОСТЬ: SQL Injection через f-строку
++           
+             sql = f"SELECT id, title, content FROM notes WHERE title LIKE '%{query}%'"
+             rows = conn.execute(sql).fetchall()
+             for r in rows:
+@@ -284,7 +271,7 @@
+                     </div>
+                 """
+         except sqlite3.Error as e:
+-            # УЯЗВИМОСТЬ: Утечка деталей ошибки SQL
++           
+             results_html = f"<div class='error-box'><b>Ошибка SQL:</b> {html.escape(str(e))}</div>"
+         finally:
+             conn.close()
+@@ -305,10 +292,8 @@
+     return render_page("Поиск", body, user)
+ 
+ 
+-# ==========================================
+-# 4. HTTP-СЕРВЕР
+-# ==========================================
+ 
++
+ class NotesHandler(http.server.BaseHTTPRequestHandler):
+     def _send_html(self, status, content, headers=()):
+         body_bytes = content.encode("utf-8")

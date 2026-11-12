@@ -1,0 +1,20 @@
+--- app_old.py	2026-11-13 01:59:15
++++ app.py	2026-11-13 02:00:55
+@@ -233,9 +233,15 @@
+ 
+ 
+ def view_note_detail(user, note_id):
+-    conn = get_db()
++    if not user:
++        return 404, render_page("Не найдено", "<div class='error-box'>Заметка не найдена</div>", user)
+ 
+-    note = conn.execute("SELECT id, user_id, title, content FROM notes WHERE id = ?", (note_id,)).fetchone()
++    conn = get_db()
++   
++    note = conn.execute(
++        "SELECT id, user_id, title, content FROM notes WHERE id = ? AND user_id = ?",
++        (note_id, user[0]),
++    ).fetchone()
+     conn.close()
+ 
+     if not note:

@@ -1,0 +1,21 @@
+--- app_old.py	2026-11-13 02:23:52
++++ app.py	2026-11-13 02:25:06
+@@ -263,12 +263,14 @@
+ 
+ def view_search(user, query):
+     results_html = ""
+-    if query:
++    if query and user:
+         conn = get_db()
+         try:
+-           
+-            sql = f"SELECT id, title, content FROM notes WHERE title LIKE '%{query}%'"
+-            rows = conn.execute(sql).fetchall()
++          
++            rows = conn.execute(
++                "SELECT id, title, content FROM notes WHERE user_id = ? AND title LIKE ?",
++                (user[0], f"%{query}%"),
++            ).fetchall()
+             for r in rows:
+                 results_html += f"""
+                     <div class="card">
